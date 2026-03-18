@@ -1,0 +1,19 @@
+{
+  "name": "ARIA — Smart Assistant",
+  "short_name": "ARIA",
+  "description": "Smart personal assistant — timetable, nutrition, tasks, reminders.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0c0c0e",
+  "theme_color": "#0c0c0e",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Timetable", "url": "/?p=tt"    },
+    { "name": "Nutrition",  "url": "/?p=food"  },
+    { "name": "Chat ARIA",  "url": "/?p=chat"  }
+  ]
+}
