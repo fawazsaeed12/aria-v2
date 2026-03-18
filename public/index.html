@@ -754,7 +754,7 @@ function renderDash(){
     document.getElementById('nc-title').textContent=nc.course;
     document.getElementById('nc-meta').innerHTML=`<span>🕐 ${nc.start}</span>${nc.room?`<span>📍 ${nc.room}</span>`:''}${nc.prof?`<span>👤 ${nc.prof}</span>`:''}`;
     const [h,m]=nc.start.split(':').map(Number);
-    const diff=Math.max(0,Math.round(((new Date()).setHours&&((()=>{const x=new Date();x.setHours(h,m,0,0);return x;})())-new Date())/60000));
+    const _t=new Date();_t.setHours(h,m,0,0);const diff=Math.max(0,Math.round((_t-new Date())/60000));
     document.getElementById('nc-cd').textContent=diff>=60?`in ${Math.floor(diff/60)}h ${diff%60}m`:diff?`in ${diff} min`:'Starting now';
   } else {
     document.getElementById('nc-title').textContent='No upcoming classes today';
