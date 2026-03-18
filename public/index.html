@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c0c0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ARIA">
+<title>ARIA</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --bg:      #0c0c0e;
+  --s1:      #141416;
+  --s2:      #1c1c20;
+  --s3:      #242428;
+  --b:       #2e2e34;
+  --b2:      #3a3a42;
+  --t1:      #f0ede8;
+  --t2:      #9896a0;
+  --t3:      #55545e;
+  --gold:    #c8a96e;
+  --gold2:   #e8c98e;
+  --green:   #5db87a;
+  --red:     #e06464;
+  --blue:    #6494e0;
+  --amber:   #e0a840;
+  --r:       12px;
+  --r2:      8px;
+  --r3:      6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--t1);font-family:'Outfit',sans-serif;font-size:14px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;}
+
+/* ── TOPBAR ─────────────────────────────────────────────── */
+.topbar{height:50px;display:flex;align-items:center;padding:0 18px;gap:12px;border-bottom:1px solid var(--b);background:var(--s1);flex-shrink:0;z-index:30;}
+.brand{font-weight:700;font-size:1.1rem;letter-spacing:.12em;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.brand-sub{font-size:.62rem;color:var(--t3);font-family:'JetBrains Mono',monospace;letter-spacing:.1em;}
+.spacer{flex:1;}
+#clock{font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--t2);text-align:right;line-height:1.5;}
+#clock b{color:var(--t1);font-size:.85rem;font-weight:500;display:block;}
+
+/* ── BANNERS ────────────────────────────────────────────── */
+.banner{display:none;padding:8px 18px;background:var(--s2);border-bottom:1px solid var(--b);font-size:.78rem;gap:10px;align-items:center;flex-shrink:0;}
+.banner.show{display:flex;}
+.banner p{flex:1;color:var(--t2);}
+.banner p strong{color:var(--t1);}
+
+/* ── TOASTS ─────────────────────────────────────────────── */
+#toasts{position:fixed;top:58px;right:14px;z-index:999;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
+.toast{background:var(--s3);border:1px solid var(--b2);border-left:3px solid var(--gold);border-radius:var(--r2);padding:10px 14px;max-width:280px;font-size:.78rem;line-height:1.5;pointer-events:all;animation:tIn .2s ease;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.toast.err{border-left-color:var(--red);}
+.toast.ok{border-left-color:var(--green);}
+.th{font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:2px;}
+.toast.err .th{color:var(--red);}
+.toast.ok .th{color:var(--green);}
+@keyframes tIn{from{transform:translateX(110%);opacity:0;}to{transform:none;opacity:1;}}
+@keyframes tOut{to{transform:translateX(110%);opacity:0;}}
+
+/* ── LAYOUT ─────────────────────────────────────────────── */
+.shell{display:flex;flex:1;overflow:hidden;}
+
+/* ── SIDENAV ────────────────────────────────────────────── */
+.nav{width:52px;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:2px;flex-shrink:0;}
+.nb{width:38px;height:38px;border:none;background:none;border-radius:var(--r2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;color:var(--t3);transition:all .15s;position:relative;}
+.nb:hover{background:var(--s2);color:var(--t2);}
+.nb.on{background:var(--gold);color:var(--bg);}
+.nb .pip{position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:var(--red);border:1px solid var(--s1);}
+
+/* ── PANELS ─────────────────────────────────────────────── */
+.panel,.chatpanel{display:none;flex:1;overflow-y:auto;flex-direction:column;padding:16px;gap:12px;}
+.panel.on{display:flex;}
+.panel::-webkit-scrollbar{width:3px;}
+.panel::-webkit-scrollbar-thumb{background:var(--b);}
+.chatpanel{padding:0;overflow:hidden;}
+.chatpanel.on{display:flex;}
+
+/* ── CARDS ──────────────────────────────────────────────── */
+.card{background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:14px;}
+.ch{font-family:'JetBrains Mono',monospace;font-size:.6rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.ch::after{content:'';flex:1;height:1px;background:var(--b);}
+
+/* ── INPUTS ─────────────────────────────────────────────── */
+input,select,textarea{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:var(--r3);color:var(--t1);font-family:'Outfit',sans-serif;font-size:.88rem;padding:8px 10px;outline:none;transition:border .15s,background .15s;appearance:none;-webkit-appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);background:var(--s3);}
+input::placeholder,textarea::placeholder{color:var(--t3);}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2355545e'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;}
+select option{background:var(--s2);}
+label{display:block;font-size:.7rem;font-weight:500;color:var(--t2);margin-bottom:3px;letter-spacing:.03em;}
+.field{display:flex;flex-direction:column;gap:2px;}
+.row{display:flex;gap:8px;align-items:flex-end;}
+.row>.field,.row>*{flex:1;}
+.row>.btn{flex:0;}
+
+/* ── BUTTONS ────────────────────────────────────────────── */
+.btn{background:var(--gold);color:var(--bg);border:none;border-radius:var(--r3);padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:500;letter-spacing:.06em;cursor:pointer;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
+.btn:hover{opacity:.85;}
+.btn:active{transform:scale(.97);}
+.btn.ghost{background:transparent;color:var(--t2);border:1px solid var(--b);}
+.btn.ghost:hover{background:var(--s2);color:var(--t1);}
+.btn.danger{background:transparent;color:var(--red);border:1px solid rgba(224,100,100,.2);}
+.btn.danger:hover{background:rgba(224,100,100,.08);}
+.btn.sm{padding:4px 8px;font-size:.62rem;}
+
+/* ── TABS ───────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;}
+.tab{background:transparent;border:1px solid var(--b);border-radius:var(--r3);padding:5px 11px;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.06em;color:var(--t3);cursor:pointer;transition:all .15s;}
+.tab.on{background:var(--s3);border-color:var(--b2);color:var(--t1);}
+
+/* ── DASHBOARD ──────────────────────────────────────────── */
+.next-card{background:linear-gradient(135deg,rgba(200,169,110,.12),rgba(200,169,110,.04));border:1px solid rgba(200,169,110,.25);border-radius:var(--r);padding:16px;}
+.nc-eye{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:5px;}
+.nc-title{font-size:1.1rem;font-weight:600;margin-bottom:5px;}
+.nc-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:.75rem;color:var(--t2);}
+.nc-cd{font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--gold);margin-top:7px;}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.stat{background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:12px;text-align:center;}
+.snum{font-size:1.5rem;font-weight:700;line-height:1;margin-bottom:3px;}
+.slbl{font-size:.6rem;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;}
+
+/* ── NUTRITION PLAN ─────────────────────────────────────── */
+.plan-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r2);transition:opacity .2s;}
+.plan-item.eaten{opacity:.35;}
+.plan-item.eaten .pname{text-decoration:line-through;}
+.pcb{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--b2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.65rem;flex-shrink:0;transition:all .15s;}
+.plan-item.eaten .pcb{background:var(--green);border-color:var(--green);color:var(--bg);}
+.pname{flex:1;font-size:.86rem;font-weight:500;}
+.pmacros{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--t2);text-align:right;line-height:1.6;}
+.pmacros .hl{color:var(--gold);}
+.plan-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-top:8px;}
+.plan-bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:2px;transition:width .4s;}
+.psum{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--t2);}
+.psum strong{color:var(--t1);}
+.psum .pg{color:var(--green);}
+.psum .pa{color:var(--gold);}
+
+/* ── MEAL LOG ───────────────────────────────────────────── */
+.meal-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r2);}
+.mbadge{font-size:.58rem;letter-spacing:.07em;text-transform:uppercase;padding:2px 6px;border-radius:20px;font-weight:600;flex-shrink:0;}
+.mb-b{background:rgba(224,168,64,.15);color:var(--amber);}
+.mb-l{background:rgba(93,184,122,.15);color:var(--green);}
+.mb-d{background:rgba(100,148,224,.15);color:var(--blue);}
+.mb-s{background:rgba(224,100,100,.15);color:var(--red);}
+.mcal{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--t2);white-space:nowrap;}
+
+/* ── TIMETABLE ──────────────────────────────────────────── */
+.tt-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--b);border-left:3px solid transparent;border-radius:var(--r2);}
+.tt-item.td{border-left-color:var(--gold);}
+.tt-item.live{border-left-color:var(--green);background:rgba(93,184,122,.06);}
+.tt-item.past{opacity:.35;}
+.tt-time{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--t2);min-width:88px;}
+.tt-name{font-size:.88rem;font-weight:500;}
+.tt-sub{font-size:.7rem;color:var(--t3);margin-top:1px;}
+.dh{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);padding:10px 2px 4px;}
+
+/* ── TASKS ──────────────────────────────────────────────── */
+.task-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r2);transition:opacity .2s;}
+.task-item.done{opacity:.3;}
+.tcb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--b2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.6rem;flex-shrink:0;margin-top:2px;transition:all .15s;}
+.task-item.done .tcb{background:var(--green);border-color:var(--green);color:var(--bg);}
+.tbody{flex:1;}
+.ttitle{font-size:.88rem;font-weight:500;}
+.tmeta{font-size:.7rem;color:var(--t3);margin-top:2px;}
+.tmeta.ov{color:var(--red);}
+.pdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.ph{background:var(--red);}.pm{background:var(--amber);}.pl{background:var(--green);}
+
+/* ── SCAN DROP ZONE ─────────────────────────────────────── */
+.se{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r2);font-size:.82rem;}
+.se.picked{border-color:var(--green);background:rgba(93,184,122,.06);}
+.secb{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--b);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.55rem;flex-shrink:0;margin-top:2px;transition:all .15s;}
+.se.picked .secb{background:var(--green);border-color:var(--green);color:var(--bg);}
+
+/* ── CHAT ───────────────────────────────────────────────── */
+.chatmsgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.chatmsgs::-webkit-scrollbar{width:3px;}
+.chatmsgs::-webkit-scrollbar-thumb{background:var(--b);}
+.msg{display:flex;gap:8px;max-width:86%;}
+.msg.u{align-self:flex-end;flex-direction:row-reverse;}
+.av{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;}
+.msg.u .av{background:var(--s3);border:1px solid var(--b);color:var(--t2);}
+.bub{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:9px 12px;font-size:.84rem;line-height:1.55;}
+.msg.u .bub{background:var(--s3);border-color:var(--b2);}
+.mt{font-size:.6rem;color:var(--t3);margin-top:3px;padding:0 3px;}
+.dots{display:flex;gap:4px;padding:4px 2px;align-items:center;}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--t3);animation:d .8s infinite;}
+.dot:nth-child(2){animation-delay:.15s;}.dot:nth-child(3){animation-delay:.3s;}
+@keyframes d{0%,80%,100%{transform:scale(1);opacity:.4;}40%{transform:scale(1.3);opacity:1;}}
+.chatbar{border-top:1px solid var(--b);padding:10px 14px;display:flex;gap:8px;align-items:center;background:var(--s1);flex-shrink:0;}
+.chatbar input{flex:1;}
+.mic{width:34px;height:34px;border-radius:50%;border:1px solid var(--b);background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;transition:all .2s;}
+.mic:hover{border-color:var(--t2);}
+.mic.on{background:rgba(224,100,100,.12);border-color:var(--red);animation:mp 1.2s infinite;}
+@keyframes mp{0%,100%{box-shadow:0 0 0 0 rgba(224,100,100,.3);}50%{box-shadow:0 0 0 7px rgba(224,100,100,0);}}
+.vbar{display:none;align-items:center;gap:8px;padding:5px 14px;background:rgba(224,100,100,.06);border-top:1px solid rgba(224,100,100,.15);font-size:.7rem;color:var(--red);font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.vbar.on{display:flex;}
+.vwaves{display:flex;gap:3px;align-items:center;height:13px;}
+.vw{width:3px;border-radius:2px;background:var(--red);animation:vwa .6s ease-in-out infinite alternate;}
+.vw:nth-child(1){height:3px;animation-delay:0s;}.vw:nth-child(2){height:9px;animation-delay:.1s;}
+.vw:nth-child(3){height:13px;animation-delay:.2s;}.vw:nth-child(4){height:7px;animation-delay:.15s;}.vw:nth-child(5){height:4px;animation-delay:.05s;}
+@keyframes vwa{from{transform:scaleY(.4);opacity:.5;}to{transform:scaleY(1.2);opacity:1;}}
+
+/* ── NOTIF STATUS ───────────────────────────────────────── */
+.nc{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);}
+.ndot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ndot.on{background:var(--green);box-shadow:0 0 6px var(--green);}
+.ndot.off{background:var(--red);}
+.ndot.idle{background:var(--t3);}
+
+/* ── WATER ──────────────────────────────────────────────── */
+.wrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.wc{width:30px;height:30px;border-radius:var(--r3);border:1px solid var(--b);background:transparent;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.wc.on{background:rgba(100,148,224,.15);border-color:var(--blue);}
+
+/* ── SPINNER ────────────────────────────────────────────── */
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--b);border-top-color:var(--gold);animation:sp .7s linear infinite;flex-shrink:0;}
+@keyframes sp{to{transform:rotate(360deg);}}
+
+/* ── EMPTY ──────────────────────────────────────────────── */
+.empty{text-align:center;padding:28px;color:var(--t3);font-size:.82rem;}
+.empty-i{font-size:1.6rem;margin-bottom:8px;opacity:.4;}
+
+/* ── DIVIDER ────────────────────────────────────────────── */
+.div{display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;}
+.div::before,.div::after{content:'';flex:1;height:1px;background:var(--b);}
+
+/* ── CAL RING ───────────────────────────────────────────── */
+.ring-wrap{display:flex;align-items:center;gap:14px;}
+.ring-txt strong{font-size:1rem;font-weight:600;display:block;}
+.ring-txt span{font-size:.7rem;color:var(--t2);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="brand">ARIA</div>
+  </div>
+  <div class="brand-sub">assistant</div>
+  <div class="spacer"></div>
+  <div id="clock"><b id="ct">--:--</b><span id="cd">---</span></div>
+</div>
+
+<!-- banners -->
+<div class="banner" id="nb">
+  <p><strong>Enable notifications</strong> — get alerts for classes &amp; tasks even when the app is closed</p>
+  <button class="btn sm" onclick="reqNotif()">Enable</button>
+  <button class="btn ghost sm" onclick="dimBanner('nb')">✕</button>
+</div>
+<div class="banner" id="ib">
+  <p><strong>Install ARIA</strong> — add to home screen for the full app experience</p>
+  <button class="btn sm" onclick="doPWA()">Install</button>
+  <button class="btn ghost sm" onclick="dimBanner('ib')">✕</button>
+</div>
+
+<div id="toasts"></div>
+
+<div class="shell">
+  <nav class="nav">
+    <button class="nb on"  onclick="go('dash')"  title="Home">⌂</button>
+    <button class="nb"     onclick="go('food')"  title="Nutrition">◎</button>
+    <button class="nb"     onclick="go('tt')"    title="Timetable">▦</button>
+    <button class="nb"     onclick="go('tasks')" title="Tasks">✓</button>
+    <button class="nb"     onclick="go('chat')"  title="Chat">◈</button>
+  </nav>
+
+  <!-- ═══════════════ DASHBOARD ═══════════════════════════ -->
+  <div class="panel on" id="panel-dash">
+
+    <div class="next-card">
+      <div class="nc-eye">⚡ Next Class</div>
+      <div class="nc-title" id="nc-title">No upcoming classes today</div>
+      <div class="nc-meta" id="nc-meta"></div>
+      <div class="nc-cd" id="nc-cd"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="snum" id="s-cal" style="color:var(--green)">0</div><div class="slbl">kcal</div></div>
+      <div class="stat"><div class="snum" id="s-prot" style="color:var(--gold)">0g</div><div class="slbl">protein</div></div>
+      <div class="stat"><div class="snum" id="s-tasks" style="color:var(--blue)">0</div><div class="slbl">pending</div></div>
+    </div>
+
+    <div class="card">
+      <div class="ch">Nutrition Progress</div>
+      <div class="ring-wrap">
+        <svg width="54" height="54" viewBox="0 0 54 54">
+          <circle cx="27" cy="27" r="21" fill="none" stroke="var(--s3)" stroke-width="5"/>
+          <circle id="ring" cx="27" cy="27" r="21" fill="none" stroke="var(--green)" stroke-width="5"
+            stroke-dasharray="131.9" stroke-dashoffset="131.9" stroke-linecap="round"
+            transform="rotate(-90 27 27)" style="transition:stroke-dashoffset .5s"/>
+        </svg>
+        <div class="ring-txt">
+          <strong id="rlbl">0 / 3035 kcal</strong>
+          <span>Protein: <span id="rp" style="color:var(--gold)">0 / 176g</span></span>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:var(--t3);margin-bottom:5px;">WATER</div>
+        <div class="wrow" id="wcups"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch">Due Today</div>
+      <div id="dash-tasks"></div>
+    </div>
+
+    <div class="nc" id="notif-card">
+      <div class="ndot idle" id="ndot"></div>
+      <div style="flex:1"><div style="font-weight:500;" id="ntitle">Notifications off</div><div style="font-size:.7rem;color:var(--t3);" id="nsub">Tap Enable to get real phone alerts</div></div>
+      <button class="btn ghost sm" id="nbtn" onclick="reqNotif()">Enable</button>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════ NUTRITION ════════════════════════════ -->
+  <div class="panel" id="panel-food">
+
+    <div class="card">
+      <div class="ch">Daily Meal Plan <span style="color:var(--gold);font-size:.55rem;margin-left:4px;">PASTE & TRACK</span></div>
+      <p style="font-size:.75rem;color:var(--t2);margin-bottom:10px;line-height:1.55;">Paste your plan in the format: <span style="font-family:'JetBrains Mono',monospace;color:var(--gold);">Food name~protein~calories</span> — one per line. ARIA auto-parses it.</p>
+      <textarea id="plan-txt" rows="7" placeholder="4 boiled eggs~24g~280&#10;1 paratha/roti~4g~150&#10;150g chicken (lunch)~37g~250&#10;1 roti (lunch)~3g~100&#10;2 cups yogurt~20g~200&#10;2 tbsp peanut butter~8g~190&#10;2 bananas~2g~180&#10;..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn" onclick="loadPlan()">↑ Load Plan</button>
+        <button class="btn ghost" onclick="clearPlan()">Clear</button>
+      </div>
+    </div>
+
+    <div id="plan-sum"></div>
+    <div id="plan-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+    <div class="div">or log a quick meal</div>
+
+    <div class="card">
+      <div class="field" style="margin-bottom:8px;"><label>Meal Name</label><input id="ml-name" placeholder="Biryani, oats, samosa…"></div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field">
+          <label>Type</label>
+          <select id="ml-type">
+            <option value="b">Breakfast</option>
+            <option value="l">Lunch</option>
+            <option value="d">Dinner</option>
+            <option value="s">Snack</option>
+          </select>
+        </div>
+        <div class="field"><label>Calories</label><input id="ml-cal" type="number" placeholder="350" min="0"></div>
+        <div class="field"><label>Protein (g)</label><input id="ml-prot" type="number" placeholder="25" min="0"></div>
+      </div>
+      <button class="btn" onclick="addMeal()">+ Log Meal</button>
+    </div>
+
+    <div id="meal-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+  </div>
+
+  <!-- ═══════════════ TIMETABLE ════════════════════════════ -->
+  <div class="panel" id="panel-tt">
+
+    <!-- AI text parser -->
+    <div class="card">
+      <div class="ch">Paste Timetable Text <span style="color:var(--gold);font-size:.55rem;margin-left:4px;">AI PARSER</span></div>
+      <p style="font-size:.75rem;color:var(--t2);margin-bottom:10px;line-height:1.55;">
+        Paste your timetable in any format — copied from a PDF, WhatsApp, website, or just type it out. ARIA will extract all classes automatically.
+      </p>
+      <textarea id="tt-text" rows="7" placeholder="Examples of any format that works:&#10;&#10;Monday: Data Structures 9:00-10:30 Room A-104 Dr. Ahmed&#10;Tuesday: Calculus 11:00-12:00 LT-2&#10;&#10;Or even messy copy-paste from a PDF:&#10;MON 09:00 CS301 Data Structures A104 Ahmed&#10;TUE 11:00 MATH201 Calculus LT2 Khan"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button class="btn" onclick="parseTTText()">↑ Parse Timetable</button>
+        <button class="btn ghost" onclick="document.getElementById('tt-text').value=''">Clear</button>
+        <div id="scan-st" style="display:none;align-items:center;gap:6px;font-size:.75rem;color:var(--t2);">
+          <div class="spin"></div><span id="scan-msg">Parsing…</span>
+        </div>
+      </div>
+      <div id="scan-res" style="display:none;margin-top:12px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:var(--green);margin-bottom:8px;">EXTRACTED — REVIEW &amp; CONFIRM</div>
+        <div id="scan-list" style="display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn" id="scan-ok" onclick="confirmScan()">Add Classes</button>
+          <button class="btn ghost" onclick="resetScan()">Discard</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="div">or add manually</div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><label>Course Name</label><input id="tc" placeholder="Data Structures…"></div>
+        <div class="field">
+          <label>Day</label>
+          <select id="td">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+            <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><label>Start</label><input id="ts" type="time"></div>
+        <div class="field"><label>End</label><input id="te" type="time"></div>
+        <div class="field"><label>Room</label><input id="tr" placeholder="A-104"></div>
+      </div>
+      <div class="field" style="margin-bottom:8px;"><label>Professor</label><input id="tp" placeholder="Dr. Ahmed"></div>
+      <button class="btn" onclick="addTT()">+ Add Class</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" onclick="fTT('all',this)">All Days</button>
+      <button class="tab" onclick="fTT('today',this)">Today</button>
+    </div>
+    <div id="tt-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+
+  </div>
+
+  <!-- ═══════════════ TASKS ════════════════════════════════ -->
+  <div class="panel" id="panel-tasks">
+    <div class="card">
+      <div class="field" style="margin-bottom:8px;"><label>Task Title</label><input id="tk" placeholder="Submit assignment, study chapter 4…"></div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><label>Due Date &amp; Time</label><input id="tkd" type="datetime-local"></div>
+        <div class="field">
+          <label>Priority</label>
+          <select id="tkp">
+            <option value="h">High</option>
+            <option value="m" selected>Medium</option>
+            <option value="l">Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:8px;"><label>Notes</label><input id="tkn" placeholder="Optional details…"></div>
+      <button class="btn" onclick="addTask()">+ Add Task</button>
+    </div>
+    <div class="tabs">
+      <button class="tab on" onclick="fTasks('all',this)">All</button>
+      <button class="tab" onclick="fTasks('today',this)">Today</button>
+      <button class="tab" onclick="fTasks('pending',this)">Pending</button>
+    </div>
+    <div id="task-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+  </div>
+
+  <!-- ═══════════════ CHAT ════════════════════════════════ -->
+  <div class="chatpanel" id="panel-chat">
+    <div class="chatmsgs" id="chatmsgs">
+      <div class="msg">
+        <div class="av">A</div>
+        <div>
+          <div class="bub">Hey! I'm ARIA — I know your timetable, nutrition plan, meals and tasks. Ask me anything.<br><br>
+          <span style="color:var(--t2);font-size:.8rem;">Try: "What's my next class?" · "How much protein have I eaten?" · "What tasks are due today?"</span></div>
+          <div class="mt">now</div>
+        </div>
+      </div>
+    </div>
+    <div class="vbar" id="vbar">
+      <div class="vwaves"><div class="vw"></div><div class="vw"></div><div class="vw"></div><div class="vw"></div><div class="vw"></div></div>
+      <span id="vtxt">Listening…</span>
+      <span style="margin-left:auto;cursor:pointer;opacity:.5" onclick="stopVoice()">✕</span>
+    </div>
+    <div class="chatbar">
+      <button class="mic" id="mic" onclick="togVoice()" title="Voice">🎤</button>
+      <input id="cin" placeholder="Ask ARIA anything…" onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="btn" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+</div><!-- shell -->
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+const D = {
+  meals : JSON.parse(localStorage.getItem('aria_meals')  || '[]'),
+  tt    : JSON.parse(localStorage.getItem('aria_tt')     || '[]'),
+  tasks : JSON.parse(localStorage.getItem('aria_tasks')  || '[]'),
+  plan  : JSON.parse(localStorage.getItem('aria_plan')   || '[]'),
+  water : +localStorage.getItem('aria_water')  || 0,
+  wdate : localStorage.getItem('aria_wdate')   || '',
+  goalC : 3035,
+  goalP : 176
+};
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function save(){
+  localStorage.setItem('aria_meals', JSON.stringify(D.meals));
+  localStorage.setItem('aria_tt',    JSON.stringify(D.tt));
+  localStorage.setItem('aria_tasks', JSON.stringify(D.tasks));
+  localStorage.setItem('aria_plan',  JSON.stringify(D.plan));
+  localStorage.setItem('aria_water', D.water);
+  localStorage.setItem('aria_wdate', D.wdate);
+}
+
+// ─── CLOCK ───────────────────────────────────────────────
+function tick(){
+  const n=new Date();
+  document.getElementById('ct').textContent = String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  document.getElementById('cd').textContent = DAYS[n.getDay()]+' '+n.getDate()+' '+MONTHS[n.getMonth()];
+}
+setInterval(tick,1000); tick();
+
+// ─── TOAST ───────────────────────────────────────────────
+function toast(title, msg, type=''){
+  const el=document.createElement('div');
+  el.className='toast'+( type?' '+type:'');
+  el.innerHTML=`<div class="th">${title}</div>${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{ el.style.animation='tOut .2s forwards'; setTimeout(()=>el.remove(),200); },4000);
+}
+
+// ─── NAV ─────────────────────────────────────────────────
+const PANELS=['dash','food','tt','tasks','chat'];
+function go(id){
+  document.querySelectorAll('.panel,.chatpanel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav .nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('panel-'+id).classList.add('on');
+  document.querySelectorAll('.nav .nb')[PANELS.indexOf(id)].classList.add('on');
+  if(id==='dash')  renderDash();
+  if(id==='food')  { renderPlan(); renderMeals(); }
+  if(id==='tt')    renderTT('all');
+  if(id==='tasks') renderTasks(taskF);
+}
+const sp=new URLSearchParams(location.search).get('p');
+if(sp && PANELS.includes(sp)) go(sp);
+
+// ─── WATER ───────────────────────────────────────────────
+function initWater(){
+  const t=new Date().toDateString();
+  if(D.wdate!==t){D.water=0;D.wdate=t;save();}
+  renderWater();
+}
+function renderWater(){
+  const el=document.getElementById('wcups'); el.innerHTML='';
+  for(let i=0;i<8;i++){
+    const b=document.createElement('button');
+    b.className='wc'+(i<D.water?' on':'');
+    b.textContent='💧';
+    b.onclick=()=>setW(i);
+    el.appendChild(b);
+  }
+  document.getElementById('s-tasks').textContent=D.tasks.filter(t=>!t.done).length;
+}
+function setW(i){ D.water=i<D.water?i:i+1; save(); renderWater(); renderDash(); if(D.water===8) toast('Water goal ✓','8 cups done today!','ok'); }
+
+// ─── PLAN PARSER ─────────────────────────────────────────
+function loadPlan(){
+  const raw=document.getElementById('plan-txt').value.trim();
+  if(!raw){ toast('Empty','Paste your meal plan first','err'); return; }
+  const lines=raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const items=[];
+  lines.forEach(line=>{
+    // skip summary lines
+    if(/^🎯|^Amount|Total Protein|Total Calorie/i.test(line)) return;
+    // try name~Xg~Y or name~X~Y
+    const m=line.match(/^(.+?)~\s*([\d.]+)\s*g?\s*~\s*([\d.]+)/i);
+    if(m){
+      items.push({id:Date.now()+Math.random(), name:m[1].trim(), prot:parseFloat(m[2]), cal:parseFloat(m[3]), eaten:false});
+    } else if(line.length>1 && !line.startsWith('~')){
+      items.push({id:Date.now()+Math.random(), name:line, prot:0, cal:0, eaten:false});
+    }
+  });
+  if(!items.length){ toast('Parse error','Could not read format. Use: Food~protein~calories','err'); return; }
+  D.plan=items; save(); renderPlan(); renderDash();
+  document.getElementById('plan-txt').value='';
+  toast('Plan loaded ✓',items.length+' items ready to track','ok');
+}
+function clearPlan(){ if(!confirm('Clear the meal plan?')) return; D.plan=[]; save(); renderPlan(); renderDash(); }
+function togglePlan(id){
+  const it=D.plan.find(i=>i.id===id); if(!it) return;
+  it.eaten=!it.eaten; save(); renderPlan(); renderDash();
+}
+function renderPlan(){
+  const list=document.getElementById('plan-list');
+  const sum=document.getElementById('plan-sum');
+  if(!D.plan.length){ list.innerHTML=''; sum.innerHTML=''; return; }
+  const eaten=D.plan.filter(i=>i.eaten);
+  const ec=eaten.reduce((s,i)=>s+i.cal,0), ep=eaten.reduce((s,i)=>s+i.prot,0);
+  const tc=D.plan.reduce((s,i)=>s+i.cal,0), tp=D.plan.reduce((s,i)=>s+i.prot,0);
+  const pct=tc>0?Math.min(ec/tc,1):0;
+  sum.innerHTML=`<div class="psum">
+    <span>Eaten <strong>${eaten.length}/${D.plan.length}</strong></span>
+    <span>Calories <strong class="pa">${Math.round(ec)}</strong> / ${Math.round(tc)}</span>
+    <span>Protein <strong class="pg">${Math.round(ep)}g</strong> / ${Math.round(tp)}g</span>
+    <span style="margin-left:auto;"><button class="btn ghost sm" onclick="clearPlan()">Clear</button></span>
+  </div>
+  <div class="plan-bar"><div class="plan-bar-fill" style="width:${pct*100}%"></div></div>`;
+  list.innerHTML=D.plan.map(it=>`
+    <div class="plan-item ${it.eaten?'eaten':''}">
+      <div class="pcb" onclick="togglePlan(${it.id})">${it.eaten?'✓':''}</div>
+      <div class="pname">${it.name}</div>
+      <div class="pmacros">${it.prot?`<span class="hl">${it.prot}g</span> prot<br>`:''}${it.cal?it.cal+' kcal':''}</div>
+    </div>`).join('');
+}
+
+// ─── MEALS ───────────────────────────────────────────────
+function todayMeals(){ const d=new Date().toDateString(); return D.meals.filter(m=>new Date(m.ts).toDateString()===d); }
+function addMeal(){
+  const name=document.getElementById('ml-name').value.trim();
+  if(!name){ toast('Missing field','Enter a meal name','err'); return; }
+  const cal=Math.max(0,+document.getElementById('ml-cal').value||0);
+  const prot=Math.max(0,+document.getElementById('ml-prot').value||0);
+  const type=document.getElementById('ml-type').value;
+  D.meals.push({id:Date.now(),name,cal,prot,type,ts:new Date().toISOString()});
+  save(); renderMeals(); renderDash();
+  document.getElementById('ml-name').value='';
+  document.getElementById('ml-cal').value='';
+  document.getElementById('ml-prot').value='';
+  toast('Logged ✓',name,'ok');
+}
+function delMeal(id){ D.meals=D.meals.filter(m=>m.id!==id); save(); renderMeals(); renderDash(); }
+function renderMeals(){
+  const list=document.getElementById('meal-list');
+  const meals=todayMeals();
+  if(!meals.length){ list.innerHTML='<div class="empty"><div class="empty-i">🍽</div>No meals logged today</div>'; return; }
+  const badge={'b':'mb-b Breakfast','l':'mb-l Lunch','d':'mb-d Dinner','s':'mb-s Snack'};
+  list.innerHTML=meals.map(m=>`
+    <div class="meal-item">
+      <span class="mbadge ${badge[m.type]||'mb-s '+m.type}"></span>
+      <span style="flex:1;font-weight:500;">${m.name}</span>
+      <span class="mcal">${m.prot?m.prot+'g · ':''}${m.cal} kcal</span>
+      <button class="btn danger sm" onclick="delMeal(${m.id})">✕</button>
+    </div>`).join('');
+}
+
+// ─── TIMETABLE ───────────────────────────────────────────
+function addTT(){
+  const course=document.getElementById('tc').value.trim();
+  const start=document.getElementById('ts').value;
+  const end=document.getElementById('te').value;
+  const day=document.getElementById('td').value;
+  const room=document.getElementById('tr').value.trim();
+  const prof=document.getElementById('tp').value.trim();
+  if(!course||!start||!end){ toast('Missing fields','Course, start and end time required','err'); return; }
+  D.tt.push({id:Date.now(),course,day,start,end,room,prof});
+  D.tt.sort((a,b)=>a.day.localeCompare(b.day)||a.start.localeCompare(b.start));
+  save(); renderTT('all'); renderDash();
+  document.getElementById('tc').value='';
+  document.getElementById('tr').value='';
+  document.getElementById('tp').value='';
+  toast('Class added ✓',course+' · '+day+' '+start,'ok');
+}
+function delTT(id){ D.tt=D.tt.filter(t=>t.id!==id); save(); renderTT('all'); renderDash(); }
+function fTT(mode,btn){
+  document.querySelectorAll('#panel-tt .tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); renderTT(mode);
+}
+function renderTT(mode){
+  const list=document.getElementById('tt-list');
+  const today=DAYS[new Date().getDay()];
+  const nm=new Date().getHours()*60+new Date().getMinutes();
+  let entries=[...D.tt];
+  if(mode==='today') entries=entries.filter(e=>e.day===today);
+  if(!entries.length){ list.innerHTML='<div class="empty"><div class="empty-i">📅</div>No classes found.<br>Add your timetable above or scan an image.</div>'; return; }
+  const grouped={};
+  entries.forEach(e=>(grouped[e.day]=grouped[e.day]||[]).push(e));
+  const order=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  list.innerHTML=order.filter(d=>grouped[d]).map(day=>{
+    const isT=day===today;
+    return `<div class="dh">${day}${isT?' — today':''}</div>`+
+      grouped[day].map(e=>{
+        const [sh,sm]=e.start.split(':').map(Number);
+        const [eh,em]=e.end.split(':').map(Number);
+        const s0=sh*60+sm, e0=eh*60+em;
+        const live=isT&&nm>=s0&&nm<e0, past=isT&&nm>=e0;
+        return `<div class="tt-item ${isT?'td':''} ${live?'live':''} ${past?'past':''}">
+          <div class="tt-time">${e.start}–${e.end}</div>
+          <div style="flex:1"><div class="tt-name">${e.course}</div><div class="tt-sub">${[e.room,e.prof].filter(Boolean).join(' · ')||'&nbsp;'}</div></div>
+          ${live?'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--green);letter-spacing:.1em;">LIVE</span>':''}
+          <button class="btn danger sm" onclick="delTT(${e.id})">✕</button>
+        </div>`;
+      }).join('');
+  }).join('');
+}
+function nextClass(){
+  const today=DAYS[new Date().getDay()], nm=new Date().getHours()*60+new Date().getMinutes();
+  return D.tt.filter(e=>e.day===today).filter(e=>{ const [h,m]=e.start.split(':').map(Number); return h*60+m>nm; }).sort((a,b)=>a.start.localeCompare(b.start))[0]||null;
+}
+
+// ─── TASKS ───────────────────────────────────────────────
+let taskF='all';
+function addTask(){
+  const title=document.getElementById('tk').value.trim();
+  if(!title){ toast('Missing field','Enter a task title','err'); return; }
+  const due=document.getElementById('tkd').value;
+  const prio=document.getElementById('tkp').value;
+  const notes=document.getElementById('tkn').value.trim();
+  D.tasks.push({id:Date.now(),title,due,prio,notes,done:false});
+  D.tasks.sort((a,b)=>(a.due||'z').localeCompare(b.due||'z'));
+  save(); renderTasks(taskF); renderDash();
+  document.getElementById('tk').value='';
+  document.getElementById('tkd').value='';
+  document.getElementById('tkn').value='';
+  toast('Task added ✓',title,'ok');
+}
+function togTask(id){ const t=D.tasks.find(t=>t.id===id); if(t){t.done=!t.done;save();renderTasks(taskF);renderDash();} }
+function delTask(id){ D.tasks=D.tasks.filter(t=>t.id!==id); save(); renderTasks(taskF); renderDash(); }
+function fTasks(mode,btn){
+  taskF=mode;
+  document.querySelectorAll('#panel-tasks .tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); renderTasks(mode);
+}
+function renderTasks(mode){
+  const list=document.getElementById('task-list');
+  const today=new Date().toDateString();
+  let tasks=[...D.tasks];
+  if(mode==='today') tasks=tasks.filter(t=>t.due&&new Date(t.due).toDateString()===today);
+  if(mode==='pending') tasks=tasks.filter(t=>!t.done);
+  if(!tasks.length){ list.innerHTML='<div class="empty"><div class="empty-i">✓</div>Nothing here</div>'; return; }
+  const pc={'h':'ph','m':'pm','l':'pl'};
+  list.innerHTML=tasks.map(t=>{
+    const due=t.due?new Date(t.due).toLocaleString('en',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    const ov=t.due&&!t.done&&new Date(t.due)<new Date();
+    return `<div class="task-item ${t.done?'done':''}">
+      <div class="pdot ${pc[t.prio]||'pm'}"></div>
+      <div class="tcb" onclick="togTask(${t.id})">${t.done?'✓':''}</div>
+      <div class="tbody">
+        <div class="ttitle">${t.title}</div>
+        ${due?`<div class="tmeta ${ov?'ov':''}">${due}${ov?' · overdue':''}</div>`:''}
+        ${t.notes?`<div class="tmeta">${t.notes}</div>`:''}
+      </div>
+      <button class="btn danger sm" onclick="delTask(${t.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ─── DASHBOARD ───────────────────────────────────────────
+function renderDash(){
+  const meals=todayMeals();
+  const mc=meals.reduce((s,m)=>s+m.cal,0), mp=meals.reduce((s,m)=>s+m.prot,0);
+  const pe=D.plan.filter(i=>i.eaten);
+  const pc=pe.reduce((s,i)=>s+i.cal,0), pp=pe.reduce((s,i)=>s+i.prot,0);
+  const totC=mc+pc, totP=mp+pp;
+  document.getElementById('s-cal').textContent=totC;
+  document.getElementById('s-prot').textContent=Math.round(totP)+'g';
+  document.getElementById('s-tasks').textContent=D.tasks.filter(t=>!t.done).length;
+  document.getElementById('rlbl').textContent=totC+' / '+D.goalC+' kcal';
+  document.getElementById('rp').textContent=Math.round(totP)+' / '+D.goalP+'g';
+  document.getElementById('ring').style.strokeDashoffset=131.9*(1-Math.min(totC/D.goalC,1));
+  // next class
+  const nc=nextClass();
+  if(nc){
+    document.getElementById('nc-title').textContent=nc.course;
+    document.getElementById('nc-meta').innerHTML=`<span>🕐 ${nc.start}</span>${nc.room?`<span>📍 ${nc.room}</span>`:''}${nc.prof?`<span>👤 ${nc.prof}</span>`:''}`;
+    const [h,m]=nc.start.split(':').map(Number);
+    const _t=new Date();_t.setHours(h,m,0,0);const diff=Math.max(0,Math.round((_t-new Date())/60000));
+    document.getElementById('nc-cd').textContent=diff>=60?`in ${Math.floor(diff/60)}h ${diff%60}m`:diff?`in ${diff} min`:'Starting now';
+  } else {
+    document.getElementById('nc-title').textContent='No upcoming classes today';
+    document.getElementById('nc-meta').innerHTML='';
+    document.getElementById('nc-cd').textContent='';
+  }
+  // today's tasks
+  const today=new Date().toDateString();
+  const todT=D.tasks.filter(t=>t.due&&new Date(t.due).toDateString()===today&&!t.done);
+  const dt=document.getElementById('dash-tasks');
+  if(!todT.length){ dt.innerHTML='<div class="empty" style="padding:14px">No tasks due today 🎉</div>'; }
+  else dt.innerHTML=todT.slice(0,5).map(t=>`
+    <div class="task-item" style="margin-bottom:5px;">
+      <div class="pdot ${{'h':'ph','m':'pm','l':'pl'}[t.prio]||'pm'}"></div>
+      <div class="tbody"><div class="ttitle">${t.title}</div>${t.due?`<div class="tmeta">${new Date(t.due).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</div>`:''}</div>
+    </div>`).join('');
+  renderWater();
+}
+
+// ─── TIMETABLE TEXT PARSER ───────────────────────────────
+let scanned=[];
+
+async function parseTTText(){
+  const raw=document.getElementById('tt-text').value.trim();
+  if(!raw){ toast('Empty','Paste your timetable text first','err'); return; }
+  const st=document.getElementById('scan-st');
+  st.style.display='flex';
+  document.getElementById('scan-msg').textContent='Parsing timetable…';
+  document.getElementById('scan-res').style.display='none';
+  scanned=[];
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        system:'You are a timetable parser. Return ONLY a valid JSON array, no markdown, no explanation, no code blocks.',
+        messages:[{role:'user',content:'Extract ALL classes from this timetable text. Return ONLY a raw JSON array.\nEach object must have exactly: {"course":"full name","day":"Monday","start":"09:00","end":"10:30","room":"room or empty string","prof":"teacher or empty string"}\nIf a class repeats on multiple days, one entry per day.\nDays must be: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, or Sunday.\nTimes must be 24-hour HH:MM format.\n\nTimetable text:\n'+raw}]
+      })
+    });
+    st.style.display='none';
+    if(!res.ok){ toast('Error','Server error: '+res.status,'err'); return; }
+    const data=await res.json();
+    if(data.error){ toast('AI Error',data.error,'err'); return; }
+    let parsed=[];
+    try{ parsed=JSON.parse((data.reply||'').replace(/```json|```/g,'').trim()); }
+    catch(e){ toast('Parse Error','AI returned unexpected format. Try rephrasing.','err'); return; }
+    if(!Array.isArray(parsed)||!parsed.length){ toast('Nothing found','No classes detected. Add day names and times.','err'); return; }
+    scanned=parsed.map((e,i)=>({...e,_id:i,_sel:true}));
+    renderScan();
+  }catch(err){
+    document.getElementById('scan-st').style.display='none';
+    toast('Error',err.message||'Network error','err');
+  }
+}
+
+function renderScan(){
+  document.getElementById('scan-list').innerHTML=scanned.map(e=>`
+    <div class="se ${e._sel?'picked':''}" id="se${e._id}">
+      <div class="secb" onclick="togScan(${e._id})">${e._sel?'\u2713':''}</div>
+      <div><div style="font-weight:500">${e.course||'Unknown'}</div>
+      <div style="font-size:.7rem;color:var(--t2)">${e.day} \u00b7 ${e.start}\u2013${e.end}${e.room?' \u00b7 '+e.room:''}${e.prof?' \u00b7 '+e.prof:''}</div></div>
+    </div>`).join('');
+  document.getElementById('scan-ok').textContent='Add '+scanned.length+' Classes';
+  document.getElementById('scan-res').style.display='block';
+  toast('Parsed \u2713','Found '+scanned.length+' classes \u2014 review below','ok');
+}
+
+function togScan(id){
+  const e=scanned.find(e=>e._id===id); if(!e) return;
+  e._sel=!e._sel;
+  const el=document.getElementById('se'+id);
+  el.classList.toggle('picked',e._sel);
+  el.querySelector('.secb').textContent=e._sel?'\u2713':'';
+  document.getElementById('scan-ok').textContent='Add '+scanned.filter(e=>e._sel).length+' Classes';
+}
+
+function confirmScan(){
+  const add=scanned.filter(e=>e._sel);
+  if(!add.length){ toast('Nothing selected','Check at least one class','err'); return; }
+  add.forEach(e=>D.tt.push({id:Date.now()+Math.random(),course:e.course||'Class',day:e.day||'Monday',start:e.start||'09:00',end:e.end||'10:00',room:e.room||'',prof:e.prof||''}));
+  D.tt.sort((a,b)=>a.day.localeCompare(b.day)||a.start.localeCompare(b.start));
+  save(); resetScan(); renderTT('all'); renderDash();
+  toast('Saved \u2713',add.length+' classes added','ok');
+}
+
+function resetScan(){
+  scanned=[];
+  document.getElementById('scan-res').style.display='none';
+  document.getElementById('scan-st').style.display='none';
+  document.getElementById('tt-text').value='';
+}
+
+
+// ─── CHAT ────────────────────────────────────────────────
+let chatHist=[];
+function buildSys(){
+  const now=new Date(), today=DAYS[now.getDay()];
+  const meals=todayMeals();
+  const mc=meals.reduce((s,m)=>s+m.cal,0), mp=meals.reduce((s,m)=>s+m.prot,0);
+  const pe=D.plan.filter(i=>i.eaten);
+  const pc=pe.reduce((s,i)=>s+i.cal,0), pp=pe.reduce((s,i)=>s+i.prot,0);
+  return `You are ARIA, a smart personal assistant. Be concise, warm, and helpful. Today: ${now.toLocaleString('en-PK',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}.
+
+USER DATA:
+- Meals logged today: ${JSON.stringify(meals)} | Logged: ${mc} kcal, ${mp}g protein
+- Meal plan today: ${JSON.stringify(D.plan)} | Eaten from plan: ${Math.round(pc)} kcal, ${Math.round(pp)}g protein  
+- TOTAL consumed: ${mc+pc} kcal, ${Math.round(mp+pp)}g protein | Goals: ${D.goalC} kcal, ${D.goalP}g protein
+- Timetable (${today}): ${JSON.stringify(D.tt.filter(e=>e.day===today))}
+- Next class: ${JSON.stringify(nextClass())||'none'}
+- All timetable: ${JSON.stringify(D.tt)}
+- Pending tasks: ${JSON.stringify(D.tasks.filter(t=>!t.done))}
+- Water: ${D.water}/8 cups
+
+Reply in plain text only (no markdown, no asterisks). Keep answers short and direct. Guide user to the sidebar tabs to add data.`;
+}
+async function sendChat(){
+  const inp=document.getElementById('cin');
+  const msg=inp.value.trim(); if(!msg) return;
+  inp.value=''; addMsg(msg,'u');
+  chatHist.push({role:'user',content:msg});
+  const tid='typing'+Date.now();
+  const tel=document.createElement('div'); tel.className='msg'; tel.id=tid;
+  tel.innerHTML='<div class="av">A</div><div><div class="bub"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>';
+  document.getElementById('chatmsgs').appendChild(tel); scrollChat();
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:buildSys(),messages:chatHist})
+    });
+    if(!res.ok){ throw new Error('Server responded with '+res.status); }
+    const data=await res.json();
+    if(data.error){ throw new Error(data.error); }
+    const reply=data.reply||'No response.';
+    chatHist.push({role:'assistant',content:reply});
+    document.getElementById(tid)?.remove();
+    addMsg(reply,'a');
+  }catch(err){
+    document.getElementById(tid)?.remove();
+    addMsg('Sorry — '+err.message,'a');
+  }
+}
+function addMsg(text,role){
+  const el=document.createElement('div'); el.className='msg'+(role==='u'?' u':'');
+  const t=new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=role==='u'
+    ?`<div class="av" style="font-size:.6rem;font-weight:600;">you</div><div><div class="bub">${text}</div><div class="mt">${t}</div></div>`
+    :`<div class="av">A</div><div><div class="bub">${text}</div><div class="mt">${t}</div></div>`;
+  document.getElementById('chatmsgs').appendChild(el); scrollChat();
+}
+function scrollChat(){ const m=document.getElementById('chatmsgs'); m.scrollTop=m.scrollHeight; }
+
+// ─── VOICE ───────────────────────────────────────────────
+let recog=null, listening=false;
+function setupVoice(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ document.getElementById('mic').style.display='none'; return; }
+  recog=new SR(); recog.lang='en-US'; recog.interimResults=true; recog.continuous=false;
+  recog.onstart=()=>{ listening=true; document.getElementById('mic').classList.add('on'); document.getElementById('mic').textContent='⏹'; document.getElementById('vbar').classList.add('on'); };
+  recog.onresult=e=>{
+    let interim='',final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) final+=e.results[i][0].transcript; else interim+=e.results[i][0].transcript; }
+    document.getElementById('cin').value=final||interim;
+    document.getElementById('vtxt').textContent=final?'Got it…':'🎙 '+(interim.length>40?'…'+interim.slice(-40):interim);
+  };
+  recog.onend=()=>{ stopVoice(); const m=document.getElementById('cin').value.trim(); if(m) setTimeout(sendChat,300); };
+  recog.onerror=e=>{ stopVoice(); if(e.error==='not-allowed') toast('Mic denied','Allow microphone access in your browser','err'); };
+}
+function togVoice(){ if(!recog){setupVoice();if(!recog)return;} if(listening){recog.abort();stopVoice();}else{try{recog.start();}catch(e){}} }
+function stopVoice(){ listening=false; document.getElementById('mic').classList.remove('on'); document.getElementById('mic').textContent='🎤'; document.getElementById('vbar').classList.remove('on'); try{if(recog)recog.abort();}catch(e){} }
+
+// ─── REMINDERS ───────────────────────────────────────────
+function checkRem(){
+  const now=new Date(), nm=now.getHours()*60+now.getMinutes(), today=DAYS[now.getDay()];
+  D.tasks.filter(t=>!t.done&&t.due).forEach(t=>{
+    const diff=Math.round((new Date(t.due)-now)/60000);
+    if(diff===15&&!t._r15){ t._r15=true; fireNotif('⏰ Task Due in 15 min','"'+t.title+'"','t15'+t.id); toast('⏰ Reminder','"'+t.title+'" due in 15 min'); }
+    if(diff<=0&&diff>-2&&!t._r0){ t._r0=true; fireNotif('🚨 Task Due Now!','"'+t.title+'"','t0'+t.id); toast('🚨 Overdue','"'+t.title+'"','err'); }
+  });
+  D.tt.filter(c=>c.day===today).forEach(c=>{
+    const [h,m]=c.start.split(':').map(Number), diff=h*60+m-nm;
+    if(diff===10&&!c._r10){ c._r10=true; fireNotif('📚 Class in 10 min',c.course+(c.room?' · '+c.room:''),'c10'+c.id); toast('📚 Class soon',c.course+' in 10 min'); }
+    if(diff===0&&!c._r0){ c._r0=true; fireNotif('🔔 Class Starting',c.course+(c.room?' in '+c.room:''),'c0'+c.id); }
+  });
+  renderDash();
+  if(swReg) swReg.active?.postMessage({type:'CHECK',tasks:D.tasks,tt:D.tt,now:now.toISOString()});
+}
+setInterval(checkRem,60000);
+
+// ─── PWA + NOTIFICATIONS ─────────────────────────────────
+let swReg=null, installEvt=null;
+async function regSW(){
+  if(!('serviceWorker' in navigator)) return;
+  try{ swReg=await navigator.serviceWorker.register('/sw.js'); }catch(e){ console.warn('SW:',e); }
+}
+function updateNotifUI(){
+  if(!('Notification' in window)) return;
+  const p=Notification.permission;
+  const dot=document.getElementById('ndot'), title=document.getElementById('ntitle'), sub=document.getElementById('nsub'), btn=document.getElementById('nbtn');
+  const nb=document.getElementById('nb');
+  if(p==='granted'){
+    dot.className='ndot on'; title.textContent='Notifications active';
+    sub.textContent='Alerts for classes & tasks'; btn.textContent='Test'; btn.onclick=()=>fireNotif('ARIA ✓','Notifications are working!','test');
+    nb.classList.remove('show');
+  } else if(p==='denied'){
+    dot.className='ndot off'; title.textContent='Notifications blocked';
+    sub.textContent='Enable in browser settings → site permissions'; btn.textContent='Help'; btn.onclick=()=>toast('To enable','Go to browser Settings → Site Settings → Notifications → Allow');
+  } else {
+    dot.className='ndot idle';
+    if(!localStorage.getItem('aria_nb_dim')) nb.classList.add('show');
+  }
+}
+async function reqNotif(){
+  if(!('Notification' in window)){ toast('Not supported','Notifications not available in this browser','err'); return; }
+  const r=await Notification.requestPermission(); updateNotifUI();
+  if(r==='granted'){ dimBanner('nb'); setTimeout(()=>fireNotif('ARIA ✓','Notifications are working!','test'),600); }
+  else if(r==='denied') toast('Blocked','Go to browser Settings → allow notifications for this site','err');
+}
+function fireNotif(title,body,tag='aria'){
+  if(Notification.permission!=='granted') return;
+  const opts={body,tag,icon:'/icon.svg',badge:'/icon.svg',vibrate:[200,100,200]};
+  try{ if(swReg) swReg.showNotification(title,opts); else new Notification(title,opts); }catch(e){ new Notification(title,opts); }
+}
+function dimBanner(id){ document.getElementById(id).classList.remove('show'); if(id==='nb') localStorage.setItem('aria_nb_dim','1'); }
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; document.getElementById('ib').classList.add('show'); });
+window.addEventListener('appinstalled',()=>{ document.getElementById('ib').classList.remove('show'); toast('Installed ✓','ARIA added to your home screen','ok'); });
+async function doPWA(){ if(!installEvt){ toast('Add manually','Tap browser menu → Add to Home Screen'); return; } installEvt.prompt(); const{outcome}=await installEvt.userChoice; if(outcome==='accepted') document.getElementById('ib').classList.remove('show'); installEvt=null; }
+
+// ─── BOOT ────────────────────────────────────────────────
+regSW();
+setupVoice();
+initWater();
+renderDash();
+updateNotifUI();
+</script>
+</body>
+</html>
