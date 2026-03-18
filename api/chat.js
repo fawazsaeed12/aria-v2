@@ -5,7 +5,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Key: env var preferred, hardcoded fallback so it works without manual setup
   const apiKey = process.env.OPENROUTER_API_KEY || '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';
 
   let body;
@@ -16,17 +15,17 @@ export default async function handler(req, res) {
   }
 
   const { messages, system, vision } = body || {};
-
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages array required' });
   }
 
-  // Vision (timetable scan) uses Gemini — only free model with image support
-  // Chat uses Llama 3.3 70B with Gemini fallback
-  const primaryModel = vision
-    ? 'google/gemini-2.0-flash-exp:free'
-    : 'meta-llama/llama-3.3-70b-instruct:free';
-  const fallbackModel = 'google/gemini-2.0-flash-exp:free';
+  // Vision (timetable scan) needs a model with image support
+  // mistral-small-3.1 is free AND supports vision
+  // For chat: llama 3.3 70B is best free text model
+  // openrouter/free is the auto-router fallback — always works
+  const models = vision
+    ? ['mistralai/mistral-small-3.1-24b-instruct:free', 'google/gemma-3-27b-it:free', 'openrouter/free']
+    : ['meta-llama/llama-3.3-70b-instruct:free', 'mistralai/mistral-small-3.1-24b-instruct:free', 'openrouter/free'];
 
   const builtMessages = system
     ? [{ role: 'system', content: system }, ...messages]
@@ -53,27 +52,15 @@ export default async function handler(req, res) {
   };
 
   try {
-    let { ok, data } = await callOR(primaryModel);
-
-    // Fallback if primary fails
-    if (!ok || data.error) {
-      console.log(`Primary model ${primaryModel} failed, trying fallback`);
-      ({ ok, data } = await callOR(fallbackModel));
+    // Try each model in order until one works
+    for (const model of models) {
+      const { ok, data } = await callOR(model);
+      if (ok && !data.error && data.choices?.[0]?.message?.content) {
+        return res.status(200).json({ reply: data.choices[0].message.content });
+      }
+      console.log(`Model ${model} failed:`, data.error?.message || 'no content');
     }
-
-    if (data.error) {
-      console.error('OpenRouter error:', JSON.stringify(data.error));
-      return res.status(200).json({ error: `AI error: ${data.error.message || JSON.stringify(data.error)}` });
-    }
-
-    const reply = data.choices?.[0]?.message?.content;
-    if (!reply) {
-      console.error('Empty response:', JSON.stringify(data).slice(0, 300));
-      return res.status(200).json({ error: 'AI returned empty response. Try again.' });
-    }
-
-    return res.status(200).json({ reply });
-
+    return res.status(200).json({ error: 'All AI models are currently unavailable. Please try again in a moment.' });
   } catch (err) {
     console.error('Handler error:', err.message);
     return res.status(500).json({ error: `Server error: ${err.message}` });
