@@ -244,6 +244,25 @@ label{display:block;font-size:.7rem;font-weight:500;color:var(--t2);margin-botto
   .cal-day.over-goal .cdc{color:var(--amber);}
   .cal-day .cdp{color:var(--t3);font-size:.5rem;}
 
+
+  /* DAY DETAIL MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:20px;width:min(340px,90vw);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+  .modal-title{font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);}
+  .modal-date{font-size:1.1rem;font-weight:600;margin-top:2px;}
+  .modal-stat{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r2);}
+  .modal-stat-label{font-size:.75rem;color:var(--t2);}
+  .modal-stat-value{font-family:'JetBrains Mono',monospace;font-size:.88rem;font-weight:500;}
+  .modal-meal-item{padding:8px 12px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r2);font-size:.8rem;}
+  .modal-meal-name{font-weight:500;margin-bottom:2px;}
+  .modal-meal-meta{font-size:.7rem;color:var(--t3);}
+  .modal-empty{text-align:center;color:var(--t3);font-size:.8rem;padding:16px;}
+  .modal-close{background:transparent;border:1px solid var(--b);border-radius:var(--r2);color:var(--t2);cursor:pointer;padding:7px 14px;font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.06em;align-self:flex-end;}
+  .modal-close:hover{background:var(--s2);}
+  .progress-bar{height:4px;background:var(--s3);border-radius:2px;overflow:hidden;margin-top:4px;}
+  .progress-fill{height:100%;border-radius:2px;transition:width .3s;}
+
 </style>
 </head>
 <body>
@@ -953,6 +972,8 @@ function renderCalendar(){
     el.className=cls;
     el.innerHTML='<span class="cdn">'+d.getDate()+'</span>'+(data&&data.cal>0?'<span class="cdc">'+data.cal+'</span><span class="cdp">'+data.prot+'g</span>':'');
     el.title=(data&&data.cal>0?data.cal+' kcal · '+data.prot+'g protein':d.toDateString());
+    el.style.cursor='pointer';
+    el.onclick=(()=>{const dk=key,dd=new Date(d);return()=>openDayModal(dk,dd)})();
     grid.appendChild(el);
   });
 }
@@ -1180,11 +1201,88 @@ window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEv
 window.addEventListener('appinstalled',()=>{ document.getElementById('ib').classList.remove('show'); toast('Installed ✓','ARIA added to your home screen','ok'); });
 async function doPWA(){ if(!installEvt){ toast('Add manually','Tap browser menu → Add to Home Screen'); return; } installEvt.prompt(); const{outcome}=await installEvt.userChoice; if(outcome==='accepted') document.getElementById('ib').classList.remove('show'); installEvt=null; }
 
+
+// ─── DAY DETAIL MODAL ────────────────────────────────────
+function openDayModal(key, date) {
+  const data = D.hist[key];
+  const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('modal-date').textContent =
+    DAYS[date.getDay()] + ', ' + date.getDate() + ' ' + MONTHS_LONG[date.getMonth()] + ' ' + date.getFullYear();
+
+  // Stats
+  const cal = data?.cal || 0;
+  const prot = data?.prot || 0;
+  const calPct = Math.min(cal / D.goalC * 100, 100);
+  const protPct = Math.min(prot / D.goalP * 100, 100);
+  const calColor = cal > D.goalC ? 'var(--amber)' : 'var(--green)';
+  const isToday = key === todayKey();
+
+  document.getElementById('modal-stats').innerHTML = cal > 0 ? `
+    <div class="modal-stat">
+      <div>
+        <div class="modal-stat-label">Calories</div>
+        <div class="progress-bar" style="width:120px"><div class="progress-fill" style="width:${calPct}%;background:${calColor}"></div></div>
+      </div>
+      <div class="modal-stat-value" style="color:${calColor}">${cal} <span style="color:var(--t3);font-size:.7rem">/ ${D.goalC}</span></div>
+    </div>
+    <div class="modal-stat">
+      <div>
+        <div class="modal-stat-label">Protein</div>
+        <div class="progress-bar" style="width:120px"><div class="progress-fill" style="width:${protPct}%;background:var(--gold)"></div></div>
+      </div>
+      <div class="modal-stat-value" style="color:var(--gold)">${prot}g <span style="color:var(--t3);font-size:.7rem">/ ${D.goalP}g</span></div>
+    </div>
+    <div class="modal-stat">
+      <div class="modal-stat-label">vs Goal</div>
+      <div class="modal-stat-value" style="color:${cal > D.goalC ? 'var(--amber)' : 'var(--green)'}">${cal > D.goalC ? '+' + (cal - D.goalC) + ' over' : (D.goalC - cal) + ' under'}</div>
+    </div>` :
+    '<div class="modal-stat"><div class="modal-stat-label">No data</div><div class="modal-stat-value" style="color:var(--t3)">—</div></div>';
+
+  // Meals for this day
+  const dayMeals = D.meals.filter(m => {
+    const md = new Date(m.ts);
+    return md.toDateString() === date.toDateString();
+  });
+
+  const mealEl = document.getElementById('modal-meals');
+  if (!dayMeals.length) {
+    mealEl.innerHTML = '<div class="modal-empty">No meals logged' + (isToday ? ' yet today' : ' this day') + '</div>';
+  } else {
+    const badge = {b:'Breakfast',l:'Lunch',d:'Dinner',s:'Snack'};
+    mealEl.innerHTML = dayMeals.map(m =>
+      '<div class="modal-meal-item"><div class="modal-meal-name">' + m.name + '</div>' +
+      '<div class="modal-meal-meta">' + (badge[m.type]||m.type) + (m.cal?' · '+m.cal+' kcal':'') + (m.prot?' · '+m.prot+'g protein':'') + '</div></div>'
+    ).join('');
+  }
+
+  document.getElementById('day-modal').classList.add('open');
+}
+
+function closeDayModal() {
+  document.getElementById('day-modal').classList.remove('open');
+}
 // ─── BOOT ────────────────────────────────────────────────
 regSW();
 initWater();
 renderDash();
 updateNotifUI();
 </script>
+
+<!-- DAY DETAIL MODAL -->
+<div class="modal-overlay" id="day-modal" onclick="if(event.target===this)closeDayModal()">
+  <div class="modal">
+    <div>
+      <div class="modal-title">Daily Summary</div>
+      <div class="modal-date" id="modal-date">—</div>
+    </div>
+    <div id="modal-stats"></div>
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:var(--t3);margin-bottom:6px;">MEALS LOGGED</div>
+      <div id="modal-meals"></div>
+    </div>
+    <button class="modal-close" onclick="closeDayModal()">Close</button>
+  </div>
+</div>
+
 </body>
 </html>
