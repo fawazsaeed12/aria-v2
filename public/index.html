@@ -366,31 +366,24 @@ label{display:block;font-size:.7rem;font-weight:500;color:var(--t2);margin-botto
   <!-- ═══════════════ TIMETABLE ════════════════════════════ -->
   <div class="panel" id="panel-tt">
 
-    <!-- scan -->
+    <!-- AI text parser -->
     <div class="card">
-      <div class="ch">Scan Timetable Image <span style="color:var(--gold);font-size:.55rem;margin-left:4px;">AI</span></div>
-      <p style="font-size:.75rem;color:var(--t2);margin-bottom:10px;line-height:1.55;">Upload a photo of your timetable — printed, handwritten, or screenshot.</p>
-      <div class="dz" id="dz"
-        onclick="document.getElementById('ttf').click()"
-        ondragover="event.preventDefault();this.classList.add('over')"
-        ondragleave="this.classList.remove('over')"
-        ondrop="onDrop(event)">
-        <div id="dz-inner">
-          <div style="font-size:1.5rem;margin-bottom:5px;opacity:.3;">⊞</div>
-          <div style="font-weight:500;font-size:.85rem;margin-bottom:2px;">Tap to upload or drag image here</div>
-          <div style="font-size:.7rem;">JPG · PNG · any format</div>
+      <div class="ch">Paste Timetable Text <span style="color:var(--gold);font-size:.55rem;margin-left:4px;">AI PARSER</span></div>
+      <p style="font-size:.75rem;color:var(--t2);margin-bottom:10px;line-height:1.55;">
+        Paste your timetable in any format — copied from a PDF, WhatsApp, website, or just type it out. ARIA will extract all classes automatically.
+      </p>
+      <textarea id="tt-text" rows="7" placeholder="Examples of any format that works:&#10;&#10;Monday: Data Structures 9:00-10:30 Room A-104 Dr. Ahmed&#10;Tuesday: Calculus 11:00-12:00 LT-2&#10;&#10;Or even messy copy-paste from a PDF:&#10;MON 09:00 CS301 Data Structures A104 Ahmed&#10;TUE 11:00 MATH201 Calculus LT2 Khan"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button class="btn" onclick="parseTTText()">↑ Parse Timetable</button>
+        <button class="btn ghost" onclick="document.getElementById('tt-text').value=''">Clear</button>
+        <div id="scan-st" style="display:none;align-items:center;gap:6px;font-size:.75rem;color:var(--t2);">
+          <div class="spin"></div><span id="scan-msg">Parsing…</span>
         </div>
-        <img id="tt-prev" style="display:none;max-width:100%;max-height:160px;border-radius:6px;object-fit:contain;">
       </div>
-      <input type="file" id="ttf" accept="image/*" style="display:none" onchange="onTTFile(event)">
-      <div id="scan-st" style="display:none;margin-top:8px;">
-        <div style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--t2);"><div class="spin"></div><span id="scan-msg">Analysing…</span></div>
-        <div class="sbar"><div class="sbfill" id="sbf"></div></div>
-      </div>
-      <div id="scan-res" style="display:none;margin-top:10px;">
+      <div id="scan-res" style="display:none;margin-top:12px;">
         <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:var(--green);margin-bottom:8px;">EXTRACTED — REVIEW &amp; CONFIRM</div>
-        <div id="scan-list" style="display:flex;flex-direction:column;gap:5px;max-height:240px;overflow-y:auto;"></div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
+        <div id="scan-list" style="display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn" id="scan-ok" onclick="confirmScan()">Add Classes</button>
           <button class="btn ghost" onclick="resetScan()">Discard</button>
         </div>
@@ -774,97 +767,79 @@ function renderDash(){
   renderWater();
 }
 
-// ─── SCAN ────────────────────────────────────────────────
+// ─── TIMETABLE TEXT PARSER ───────────────────────────────
 let scanned=[];
-function onDrop(e){ e.preventDefault(); document.getElementById('dz').classList.remove('over'); const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith('image/')) procImg(f); }
-function onTTFile(e){ const f=e.target.files[0]; if(f) procImg(f); }
-async function procImg(file){
-  const reader=new FileReader();
-  reader.onload=async ev=>{
-    const b64=ev.target.result;
-    document.getElementById('dz-inner').style.display='none';
-    const prev=document.getElementById('tt-prev'); prev.src=b64; prev.style.display='block';
-    document.getElementById('dz').classList.add('hasimg');
-    document.getElementById('scan-res').style.display='none';
-    document.getElementById('scan-st').style.display='block';
-    animScan();
-    try{
-      const res=await fetch('/api/chat',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          vision:true,
-          system:'You are a timetable parser. Return ONLY a valid JSON array, no markdown, no code blocks, no explanation.',
-          messages:[{role:'user',content:[
-            {type:'image_url',image_url:{url:b64}},
-            {type:'text',text:'Extract ALL classes/lectures from this timetable image. Return ONLY a raw JSON array (no markdown). Each object: {"course":"full course name","day":"Monday","start":"09:00","end":"10:30","room":"room or empty string","prof":"teacher or empty string"}. If a class repeats on multiple days, one entry per day. Return raw JSON array only.'}
-          ]}]
-        })
-      });
-      document.getElementById('scan-st').style.display='none';
-      if(!res.ok){ toast('Scan failed','Server error: '+res.status,'err'); return; }
-      const data=await res.json();
-      if(data.error){ toast('Scan failed',data.error,'err'); return; }
-      let parsed=[];
-      try{ parsed=JSON.parse((data.reply||'[]').replace(/```json|```/g,'').trim()); }
-      catch(e){ toast('Parse error','AI returned unexpected format. Try a clearer image.','err'); return; }
-      if(!Array.isArray(parsed)||!parsed.length){ toast('No classes found','Try a clearer or higher-resolution image.','err'); return; }
-      scanned=parsed.map((e,i)=>({...e,_id:i,_sel:true}));
-      renderScan();
-    }catch(err){
-      document.getElementById('scan-st').style.display='none';
-      toast('Scan failed',err.message||'Network error','err');
-    }
-  };
-  reader.readAsDataURL(file);
+
+async function parseTTText(){
+  const raw=document.getElementById('tt-text').value.trim();
+  if(!raw){ toast('Empty','Paste your timetable text first','err'); return; }
+  const st=document.getElementById('scan-st');
+  st.style.display='flex';
+  document.getElementById('scan-msg').textContent='Parsing timetable…';
+  document.getElementById('scan-res').style.display='none';
+  scanned=[];
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        system:'You are a timetable parser. Return ONLY a valid JSON array, no markdown, no explanation, no code blocks.',
+        messages:[{role:'user',content:'Extract ALL classes from this timetable text. Return ONLY a raw JSON array.\nEach object must have exactly: {"course":"full name","day":"Monday","start":"09:00","end":"10:30","room":"room or empty string","prof":"teacher or empty string"}\nIf a class repeats on multiple days, one entry per day.\nDays must be: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, or Sunday.\nTimes must be 24-hour HH:MM format.\n\nTimetable text:\n'+raw}]
+      })
+    });
+    st.style.display='none';
+    if(!res.ok){ toast('Error','Server error: '+res.status,'err'); return; }
+    const data=await res.json();
+    if(data.error){ toast('AI Error',data.error,'err'); return; }
+    let parsed=[];
+    try{ parsed=JSON.parse((data.reply||'').replace(/```json|```/g,'').trim()); }
+    catch(e){ toast('Parse Error','AI returned unexpected format. Try rephrasing.','err'); return; }
+    if(!Array.isArray(parsed)||!parsed.length){ toast('Nothing found','No classes detected. Add day names and times.','err'); return; }
+    scanned=parsed.map((e,i)=>({...e,_id:i,_sel:true}));
+    renderScan();
+  }catch(err){
+    document.getElementById('scan-st').style.display='none';
+    toast('Error',err.message||'Network error','err');
+  }
 }
-function animScan(){
-  const bar=document.getElementById('sbf');
-  const msgs=['Reading layout…','Detecting classes…','Extracting times…','Parsing rooms…','Almost done…'];
-  let p=0,s=0;
-  const iv=setInterval(()=>{
-    p=Math.min(p+Math.random()*14+5,90); bar.style.width=p+'%';
-    if(s<msgs.length) document.getElementById('scan-msg').textContent=msgs[s++];
-    if(document.getElementById('scan-st').style.display==='none') clearInterval(iv);
-  },600);
-}
+
 function renderScan(){
   document.getElementById('scan-list').innerHTML=scanned.map(e=>`
     <div class="se ${e._sel?'picked':''}" id="se${e._id}">
-      <div class="secb" onclick="togScan(${e._id})">${e._sel?'✓':''}</div>
+      <div class="secb" onclick="togScan(${e._id})">${e._sel?'\u2713':''}</div>
       <div><div style="font-weight:500">${e.course||'Unknown'}</div>
-      <div style="font-size:.7rem;color:var(--t2)">${e.day} · ${e.start}–${e.end}${e.room?' · '+e.room:''}${e.prof?' · '+e.prof:''}</div></div>
+      <div style="font-size:.7rem;color:var(--t2)">${e.day} \u00b7 ${e.start}\u2013${e.end}${e.room?' \u00b7 '+e.room:''}${e.prof?' \u00b7 '+e.prof:''}</div></div>
     </div>`).join('');
   document.getElementById('scan-ok').textContent='Add '+scanned.length+' Classes';
   document.getElementById('scan-res').style.display='block';
-  toast('Scan complete ✓','Found '+scanned.length+' classes — review below','ok');
+  toast('Parsed \u2713','Found '+scanned.length+' classes \u2014 review below','ok');
 }
+
 function togScan(id){
   const e=scanned.find(e=>e._id===id); if(!e) return;
   e._sel=!e._sel;
   const el=document.getElementById('se'+id);
   el.classList.toggle('picked',e._sel);
-  el.querySelector('.secb').textContent=e._sel?'✓':'';
+  el.querySelector('.secb').textContent=e._sel?'\u2713':'';
   document.getElementById('scan-ok').textContent='Add '+scanned.filter(e=>e._sel).length+' Classes';
 }
+
 function confirmScan(){
   const add=scanned.filter(e=>e._sel);
   if(!add.length){ toast('Nothing selected','Check at least one class','err'); return; }
   add.forEach(e=>D.tt.push({id:Date.now()+Math.random(),course:e.course||'Class',day:e.day||'Monday',start:e.start||'09:00',end:e.end||'10:00',room:e.room||'',prof:e.prof||''}));
   D.tt.sort((a,b)=>a.day.localeCompare(b.day)||a.start.localeCompare(b.start));
   save(); resetScan(); renderTT('all'); renderDash();
-  toast('Timetable saved ✓',add.length+' classes added','ok');
+  toast('Saved \u2713',add.length+' classes added','ok');
 }
+
 function resetScan(){
   scanned=[];
   document.getElementById('scan-res').style.display='none';
   document.getElementById('scan-st').style.display='none';
-  document.getElementById('tt-prev').style.display='none';
-  document.getElementById('dz-inner').style.display='';
-  document.getElementById('dz').classList.remove('hasimg');
-  document.getElementById('ttf').value='';
-  document.getElementById('sbf').style.width='0%';
+  document.getElementById('tt-text').value='';
 }
+
 
 // ─── CHAT ────────────────────────────────────────────────
 let chatHist=[];
